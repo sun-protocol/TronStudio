@@ -1,5 +1,5 @@
 {
-  "name": "TronStudio",
+  "name": "@sun-protocol/tron-studio",
   "version": "0.0.1",
   "description": "Hardhat Plugin For Replicable Deployments And Tests",
   "repository": "https://github.com/sun-protocol/TronStudio",
@@ -18,7 +18,6 @@
     "testing",
     "tool",
     "hardhat",
-    "hardhat-deploy",
     "hardhat-plugin"
   ],
   "files": [
