@@ -1,5 +1,5 @@
 const path = require("path");
-import { access, constants } from 'fs';
+import { access, constants, promises as fsPromises  } from 'fs';
 import fetch from 'node-fetch';
 import { writeFile } from 'fs/promises';
 import { createWriteStream } from 'fs';
@@ -19,6 +19,15 @@ async function downloadFile(url: string, dest: string): Promise<void> {
   } catch (error) {
     console.error('download failed', error);
   }
+}
+
+async function checkFileExists(filePath: string): Promise<boolean> {
+    try {
+        await fsPromises.access(filePath, constants.F_OK);
+        return true;
+    } catch (error) {
+        return false;
+    }
 }
 
 export async function loadTronSolc(solcVersion: string) {
@@ -41,12 +50,7 @@ export async function loadTronSolc(solcVersion: string) {
     );
     longVersion = "0.8.22";
   }
-  let needDownload = false;
-  access(compilerPath, constants.F_OK, (err) => {
-    if (err) {
-      needDownload = true;
-    }
-  });
+  let needDownload = !await checkFileExists(compilerPath);
   if (needDownload) {
     await downloadFile(compilerRemotePath, compilerPath);    
   }

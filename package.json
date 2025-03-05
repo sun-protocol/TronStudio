@@ -1,6 +1,6 @@
 {
   "name": "@sun-protocol/tron-studio",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Hardhat Plugin For Replicable Deployments And Tests",
   "repository": "https://github.com/sun-protocol/TronStudio",
   "author": "dev",
@@ -83,6 +83,7 @@
     "murmur-128": "^0.2.1",
     "qs": "^6.9.4",
     "node-fetch": "^3.3.2",
+    "tronweb": "^5.3.1",
     "zksync-ethers": "^5.0.0"
   },
   "scripts": {
