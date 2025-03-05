@@ -22,8 +22,10 @@ import {
   TASK_TEST,
   TASK_NODE_GET_PROVIDER,
   TASK_NODE_SERVER_READY,
+  TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD,
 } from 'hardhat/builtin-tasks/task-names';
 import {lazyObject} from 'hardhat/plugins';
+import {loadTronSolc} from './tron/solc';
 
 import debug from 'debug';
 const log = debug('hardhat:sun-protocol:tron-studio');
@@ -1093,3 +1095,20 @@ task('export-artifacts')
       fs.writeFileSync(filepath, JSON.stringify(dataToWrite, null, '  '));
     }
   });
+
+subtask(
+  TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD,
+  async (
+    args: {
+      solcVersion: string;
+    },
+    hre,
+    runSuper
+  ) => {
+    let nw = hre.hardhatArguments["network"]?hre.hardhatArguments["network"]:"localhost";
+    if (hre.config.networks[nw].tron) {
+      return await loadTronSolc(args.solcVersion);
+    }
+    return runSuper();
+  }
+);
