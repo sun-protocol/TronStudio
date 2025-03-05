@@ -65,6 +65,7 @@ declare module 'hardhat/types/config' {
     companionNetworks?: {[name: string]: string};
     verify?: {etherscan?: {apiKey?: string; apiUrl?: string}};
     zksync?: boolean;
+    tron?: boolean;
     autoImpersonate?: boolean;
   }
 
@@ -76,6 +77,7 @@ declare module 'hardhat/types/config' {
     companionNetworks?: {[name: string]: string};
     verify?: {etherscan?: {apiKey?: string; apiUrl?: string}};
     zksync?: boolean;
+    tron?: boolean;
     autoImpersonate?: boolean;
   }
 
@@ -93,6 +95,7 @@ declare module 'hardhat/types/config' {
     companionNetworks: {[name: string]: string};
     verify?: {etherscan?: {apiKey?: string; apiUrl?: string}};
     zksync?: boolean;
+    tron?: boolean;
     autoImpersonate?: boolean;
   }
 
@@ -104,6 +107,7 @@ declare module 'hardhat/types/config' {
     companionNetworks: {[name: string]: string};
     verify?: {etherscan?: {apiKey?: string; apiUrl?: string}};
     zksync?: boolean;
+    tron?: boolean;
     autoImpersonate?: boolean;
   }
 
@@ -143,6 +147,7 @@ declare module 'hardhat/types/runtime' {
     companionNetworks: {[name: string]: string};
     verify?: {etherscan?: {apiKey?: string; apiUrl?: string}};
     zksync?: boolean;
+    tron?: boolean;
     autoImpersonate?: boolean;
   }
 }

@@ -6,17 +6,13 @@ import {
   TransactionRequest,
 } from '@ethersproject/providers';
 import {getAddress} from '@ethersproject/address';
-import {
-  Contract,
-  ContractFactory,
-  PayableOverrides,
-} from '@ethersproject/contracts';
-import * as zk from 'zksync-ethers';
+import {Contract, PayableOverrides} from '@ethersproject/contracts';
+import * as zk from 'zksync-web3';
 import {AddressZero} from '@ethersproject/constants';
 import {BigNumber} from '@ethersproject/bignumber';
 import {Wallet} from '@ethersproject/wallet';
 import {keccak256 as solidityKeccak256} from '@ethersproject/solidity';
-import {zeroPad, hexlify, hexConcat} from '@ethersproject/bytes';
+import {zeroPad, hexlify} from '@ethersproject/bytes';
 import {Interface, FunctionFragment} from '@ethersproject/abi';
 import {
   Deployment,
@@ -43,19 +39,8 @@ import {UnknownSignerError} from './errors';
 import {filterABI, mergeABIs, recode} from './utils';
 import fs from 'fs-extra';
 
-import OpenZeppelinTransparentProxy from '../extendedArtifacts/TransparentUpgradeableProxy.json';
-import OptimizedTransparentUpgradeableProxy from '../extendedArtifacts/OptimizedTransparentUpgradeableProxy.json';
-import DefaultProxyAdmin from '../extendedArtifacts/ProxyAdmin.json';
-import eip173Proxy from '../extendedArtifacts/EIP173Proxy.json';
-import eip173ProxyWithReceive from '../extendedArtifacts/EIP173ProxyWithReceive.json';
-import erc1967Proxy from '../extendedArtifacts/ERC1967Proxy.json';
-import diamondBase from '../extendedArtifacts/Diamond.json';
 import oldDiamonBase from './old_diamondbase.json';
-import diamondERC165Init from '../extendedArtifacts/DiamondERC165Init.json';
-import diamondCutFacet from '../extendedArtifacts/DiamondCutFacet.json';
-import diamondLoupeFacet from '../extendedArtifacts/DiamondLoupeFacet.json';
-import ownershipFacet from '../extendedArtifacts/OwnershipFacet.json';
-import {Artifact, EthereumProvider, Network} from 'hardhat/types';
+import {Artifact, EthereumProvider} from 'hardhat/types';
 import {DeploymentsManager} from './DeploymentsManager';
 import enquirer from 'enquirer';
 import {
@@ -65,6 +50,10 @@ import {
 import {getDerivationPath} from './hdpath';
 import {bnReplacer} from './internal/utils';
 import {DeploymentFactory} from './DeploymentFactory';
+import {TronWeb3Provider} from './tron/provider';
+import {TronSigner} from './tron/signer';
+import {CreateSmartContract} from './tron/types';
+import {getDefaultArtifact} from './defaultArtifacts';
 
 let LedgerSigner: any; // TODO type
 let ethersprojectHardwareWalletsModule: any | undefined;
@@ -115,7 +104,7 @@ You'll need to wait the tx resolve, or increase the gas price via --gasprice (th
 }
 
 function fixProvider(providerGiven: any): any {
-  // allow it to be used by ethers without any change
+  // alow it to be used by ethers without any change
   if (providerGiven.sendAsync === undefined) {
     providerGiven.sendAsync = (
       req: {
@@ -279,14 +268,21 @@ export function addHelpers(
     ) => Promise<void>;
   };
 } {
-  let provider: Web3Provider | zk.Web3Provider;
+  let provider: Web3Provider | zk.Web3Provider | TronWeb3Provider;
   const availableAccounts: {[name: string]: boolean} = {};
 
-  async function init(): Promise<Web3Provider | zk.Web3Provider> {
+  async function init(): Promise<
+    Web3Provider | zk.Web3Provider | TronWeb3Provider
+  > {
     if (!provider) {
       await deploymentManager.setupAccounts();
       if (network.zksync) {
         provider = new zk.Web3Provider(fixProvider(network.provider));
+      } else if (network.tron) {
+        provider = new TronWeb3Provider(
+          fixProvider(network.provider),
+          network.config
+        );
       } else {
         provider = new Web3Provider(fixProvider(network.provider));
       }
@@ -399,7 +395,6 @@ export function addHelpers(
   async function ensureCreate2DeployerReady(options: {
     from: string;
     log?: boolean;
-    waitConfirmations?: number;
     gasPrice?: string | BigNumber;
     maxFeePerGas?: string | BigNumber;
     maxPriorityFeePerGas?: string | BigNumber;
@@ -421,7 +416,9 @@ export function addHelpers(
       const txRequest = {
         to: senderAddress,
         value: (
-          await deploymentManager.getDeterministicDeploymentFactoryFunding()
+          await deploymentManager.getDeterministicDeploymentFactoryFunding(
+            network.tron
+          )
         ).toHexString(),
         gasPrice: options.gasPrice,
         maxFeePerGas: options.maxFeePerGas,
@@ -453,7 +450,7 @@ export function addHelpers(
         log(` (tx: ${ethTx.hash})...`);
       }
       ethTx = await onPendingTx(ethTx);
-      await ethTx.wait(options.waitConfirmations);
+      await ethTx.wait();
 
       if (options.log || hardwareWallet) {
         print(
@@ -469,7 +466,7 @@ export function addHelpers(
       if (options.log || hardwareWallet) {
         log(` (tx: ${deployTx.hash})...`);
       }
-      await deployTx.wait(options.waitConfirmations);
+      await deployTx.wait();
     }
     return create2DeployerAddress;
   }
@@ -550,6 +547,10 @@ export function addHelpers(
 
     let create2Address;
     if (options.deterministicDeployment) {
+      // feature not ready for Tron yet
+      if (network.tron) {
+        throw new Error('deterministic deployment not supported on Tron');
+      }
       if (typeof unsignedTx.data === 'string') {
         const create2DeployerAddress = await ensureCreate2DeployerReady(
           options
@@ -570,18 +571,25 @@ export function addHelpers(
       }
     }
 
-    await overrideGasLimit(unsignedTx, options, (newOverrides) =>
-      ethersSigner.estimateGas(newOverrides)
-    );
-    await setupGasPrice(unsignedTx);
-    await setupNonce(from, unsignedTx);
-
-    // Temporary workaround for https://github.com/ethers-io/ethers.js/issues/2078
-    // TODO: Remove me when LedgerSigner adds proper support for 1559 txns
-    if (hardwareWallet === 'ledger') {
-      unsignedTx.type = 1;
-    } else if (hardwareWallet === 'trezor') {
-      unsignedTx.type = 1;
+    if (network.tron) {
+      const feeLimit = await (ethersSigner as TronSigner).getFeeLimit(
+        unsignedTx,
+        overrides
+      );
+      (unsignedTx as CreateSmartContract).feeLimit = feeLimit;
+    } else {
+      await overrideGasLimit(unsignedTx, options, (newOverrides) =>
+        ethersSigner.estimateGas(newOverrides)
+      );
+      await setupGasPrice(unsignedTx);
+      await setupNonce(from, unsignedTx);
+      // Temporary workaround for https://github.com/ethers-io/ethers.js/issues/2078
+      // TODO: Remove me when LedgerSigner adds proper support for 1559 txns
+      if (hardwareWallet === 'ledger') {
+        unsignedTx.type = 1;
+      } else if (hardwareWallet === 'trezor') {
+        unsignedTx.type = 1;
+      }
     }
 
     if (unknown) {
@@ -628,21 +636,17 @@ export function addHelpers(
     }
     tx = await onPendingTx(tx, name, preDeployment);
     const receipt = await tx.wait(options.waitConfirmations);
-    const address = factory.getDeployedAddress(
-      receipt,
-      options,
-      create2Address
-    );
-
+    const address =
+      options.deterministicDeployment && create2Address
+        ? create2Address
+        : receipt.contractAddress;
     const deployment = {
       ...preDeployment,
       address,
       receipt,
       transactionHash: receipt.transactionHash,
       libraries: options.libraries,
-      factoryDeps: unsignedTx.customData?.factoryDeps || [],
     };
-
     await saveDeployment(name, deployment);
     if (options.log || hardwareWallet) {
       print(
@@ -881,8 +885,7 @@ export function addHelpers(
 
       if (transaction) {
         const differences = await factory.compareDeploymentTransaction(
-          transaction,
-          deployment
+          transaction
         );
         return {differences, address: deployment.address};
       } else {
@@ -1064,12 +1067,17 @@ export function addHelpers(
     upgradeMethod: string | undefined;
     upgradeArgsTemplate: any[];
   }> {
+    const {isTronNetworkWithTronSolc} = deploymentManager;
     const oldDeployment = await getDeploymentOrNUll(name);
     let contractName = options.contract;
     let implementationName = name + '_Implementation';
     let updateMethod: string | undefined;
     let updateArgs: any[] | undefined;
     let upgradeIndex;
+    const eip173Proxy: ExtendedArtifact = getDefaultArtifact(
+      'EIP173Proxy',
+      isTronNetworkWithTronSolc
+    );
     let proxyContract: ExtendedArtifact = eip173Proxy;
     let checkABIConflict = true;
     let checkProxyAdmin = true;
@@ -1141,34 +1149,28 @@ export function addHelpers(
             );
           } catch (e) {}
           if (!proxyContract || proxyContract === eip173Proxy) {
-            if (options.proxy.proxyContract === 'EIP173ProxyWithReceive') {
-              proxyContract = eip173ProxyWithReceive;
-            } else if (options.proxy.proxyContract === 'EIP173Proxy') {
-              proxyContract = eip173Proxy;
-            } else if (
-              options.proxy.proxyContract === 'OpenZeppelinTransparentProxy'
-            ) {
-              checkABIConflict = false;
-              proxyContract = OpenZeppelinTransparentProxy;
-              viaAdminContract = 'DefaultProxyAdmin';
-            } else if (
-              options.proxy.proxyContract === 'OptimizedTransparentProxy'
-            ) {
-              checkABIConflict = false;
-              proxyContract = OptimizedTransparentUpgradeableProxy;
-              viaAdminContract = 'DefaultProxyAdmin';
-              // } else if (options.proxy.proxyContract === 'UUPS') {
-              //   checkABIConflict = true;
-              //   proxyContract = UUPSProxy;
-            } else if (options.proxy.proxyContract === 'UUPS') {
-              checkABIConflict = false;
-              checkProxyAdmin = false;
-              proxyContract = erc1967Proxy;
-              proxyArgsTemplate = ['{implementation}', '{data}'];
-            } else {
-              throw new Error(
-                `no contract found for ${options.proxy.proxyContract}`
-              );
+            proxyContract = getDefaultArtifact(
+              options.proxy.proxyContract,
+              isTronNetworkWithTronSolc
+            );
+            switch (options.proxy.proxyContract) {
+              case 'EIP173ProxyWithReceive':
+              case 'EIP173Proxy':
+                break; // No specific logic, but don't throw an error
+              case 'OpenZeppelinTransparentProxy':
+              case 'OptimizedTransparentProxy':
+                checkABIConflict = false;
+                viaAdminContract = 'DefaultProxyAdmin';
+                break;
+              case 'UUPS':
+                checkABIConflict = false;
+                checkProxyAdmin = false;
+                proxyArgsTemplate = ['{implementation}', '{data}'];
+                break;
+              default:
+                throw new Error(
+                  `no contract found for ${options.proxy.proxyContract}`
+                );
             }
           }
         }
@@ -1301,7 +1303,10 @@ Note that in this case, the contract deployment will not behave the same if depl
 
         if (!proxyAdminContract) {
           if (viaAdminContract === 'DefaultProxyAdmin') {
-            proxyAdminContract = DefaultProxyAdmin;
+            proxyAdminContract = getDefaultArtifact(
+              'DefaultProxyAdmin',
+              isTronNetworkWithTronSolc
+            );
           } else {
             throw new Error(
               `no contract found for ${proxyAdminArtifactNameOrContract}`
@@ -1473,19 +1478,11 @@ Note that in this case, the contract deployment will not behave the same if depl
         // console.log(`proxy deployed at ${proxy.address} for ${proxy.receipt.gasUsed}`);
       } else {
         let from = options.from;
-        let ownerStorage: string;
 
-        // Use EIP173 defined owner function if present
-        const deployedProxy = new Contract(proxy.address, proxy.abi, provider);
-        if (deployedProxy.functions['owner']) {
-          ownerStorage = await deployedProxy.owner();
-        } else {
-          ownerStorage = await provider.getStorageAt(
-            proxy.address,
-            '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103'
-          );
-        }
-
+        const ownerStorage = await provider.getStorageAt(
+          proxy.address,
+          '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103'
+        );
         const currentOwner = getAddress(`0x${ownerStorage.substr(-40)}`);
         if (currentOwner === AddressZero) {
           if (checkProxyAdmin) {
@@ -1643,12 +1640,12 @@ Note that in this case, the contract deployment will not behave the same if depl
 
   async function getFrom(from: string): Promise<{
     address: Address;
-    ethersSigner: Signer | zk.Signer;
+    ethersSigner: Signer | zk.Signer | TronSigner;
     hardwareWallet?: string;
     unknown: boolean;
   }> {
-    let ethersSigner: Signer | zk.Signer | undefined;
-    let wallet: Wallet | zk.Wallet | undefined;
+    let ethersSigner: Signer | zk.Signer | TronSigner | undefined;
+    let wallet: Wallet | zk.Wallet | TronSigner | undefined;
     let hardwareWallet: string | undefined = undefined;
     let unknown = false;
     let derivationPath: string | undefined = undefined;
@@ -1660,6 +1657,9 @@ Note that in this case, the contract deployment will not behave the same if depl
       if (network.zksync) {
         wallet = new zk.Wallet(from, provider as zk.Provider);
         ethersSigner = wallet as unknown as zk.Signer;
+      } else if (network.tron) {
+        wallet = (provider as TronWeb3Provider).addSigner(from);
+        ethersSigner = wallet;
       } else {
         wallet = new Wallet(from, provider);
         ethersSigner = wallet;
@@ -1816,6 +1816,7 @@ Note that in this case, the contract deployment will not behave the same if depl
     name: string,
     options: DiamondOptions
   ): Promise<DeployResult> {
+    const {isTronNetworkWithTronSolc} = deploymentManager;
     let proxy: Deployment | undefined;
     const proxyName = name + '_DiamondProxy';
     const oldDeployment = await getDeploymentOrNUll(name);
@@ -1834,7 +1835,11 @@ Note that in this case, the contract deployment will not behave the same if depl
       return deployResult;
     }
 
-    let diamondArtifact: ExtendedArtifact = diamondBase;
+    let diamondArtifact: ExtendedArtifact = getDefaultArtifact(
+      'DiamondBase',
+      isTronNetworkWithTronSolc
+    );
+
     if (options.diamondContract) {
       if (typeof options.diamondContract === 'string') {
         diamondArtifact = await partialExtension.getExtendedArtifact(
@@ -1859,7 +1864,10 @@ Note that in this case, the contract deployment will not behave the same if depl
     if (options.defaultCutFacet === undefined || options.defaultCutFacet) {
       facetsSet.push({
         name: '_DefaultDiamondCutFacet',
-        contract: diamondCutFacet,
+        contract: getDefaultArtifact(
+          'DiamondCutFacet',
+          isTronNetworkWithTronSolc
+        ),
         args: [],
         deterministic: true,
       });
@@ -1870,14 +1878,20 @@ Note that in this case, the contract deployment will not behave the same if depl
     ) {
       facetsSet.push({
         name: '_DefaultDiamondOwnershipFacet',
-        contract: ownershipFacet,
+        contract: getDefaultArtifact(
+          'OwnershipFacet',
+          isTronNetworkWithTronSolc
+        ),
         args: [],
         deterministic: true,
       });
     }
     facetsSet.push({
       name: '_DefaultDiamondLoupeFacet',
-      contract: diamondLoupeFacet,
+      contract: getDefaultArtifact(
+        'DiamondLoupeFacet',
+        isTronNetworkWithTronSolc
+      ),
       args: [],
       deterministic: true,
     });
@@ -2241,7 +2255,10 @@ Note that in this case, the contract deployment will not behave the same if depl
             {
               from: options.from,
               deterministicDeployment: true,
-              contract: diamondERC165Init,
+              contract: getDefaultArtifact(
+                'DiamondERC165Init',
+                isTronNetworkWithTronSolc
+              ),
               autoMine: options.autoMine,
               estimateGasExtra: options.estimateGasExtra,
               estimatedGasLimit: options.estimatedGasLimit,
@@ -2322,7 +2339,7 @@ Note that in this case, the contract deployment will not behave the same if depl
           if (typeof options.deterministicSalt === 'string') {
             if (options.deterministicSalt === salt) {
               throw new Error(
-                `deterministicSalt cannot be 0x000..., it needs to be a non-zero bytes32 salt. This is to ensure you are explicitly specifying different addresses for multiple diamonds`
+                `deterministicSalt cannot be 0x000..., it needs to be a non-zero bytes32 salt. This is to ensure you are explicitly specyfying different addresses for multiple diamonds`
               );
             } else {
               if (options.deterministicSalt.length !== 66) {
@@ -2546,7 +2563,7 @@ Note that in this case, the contract deployment will not behave the same if depl
         await provider.send('evm_mine', []);
       } catch (e) {}
     }
-    return pendingTx.wait(tx.waitConfirmations);
+    return pendingTx.wait();
   }
 
   async function catchUnknownSigner(
@@ -2704,10 +2721,28 @@ data: ${data}
       }
     }
 
-    tx = await handleSpecificErrors(
-      ethersContract.functions[methodName](...ethersArgs)
-    );
-
+    if (network.tron) {
+      const method = ethersContract.interface.getFunction(methodName);
+      const methodParams = method.inputs.map((input) => input.type);
+      const funcSig = `${methodName}(${methodParams.join(',')})`;
+      const tronArgs = args.map((a, i) => ({
+        type: methodParams[i],
+        value: a,
+      }));
+      tx = await handleSpecificErrors(
+        (ethersSigner.provider as TronWeb3Provider).triggerSmartContract(
+          from,
+          deployment.address,
+          funcSig,
+          tronArgs,
+          overrides
+        )
+      );
+    } else {
+      tx = await handleSpecificErrors(
+        ethersContract.functions[methodName](...ethersArgs)
+      );
+    }
     tx = await onPendingTx(tx);
 
     if (options.log || hardwareWallet) {
@@ -2719,7 +2754,7 @@ data: ${data}
         await provider.send('evm_mine', []);
       } catch (e) {}
     }
-    const receipt = await tx.wait(options.waitConfirmations);
+    const receipt = await tx.wait();
     if (options.log || hardwareWallet) {
       print(`: performed with ${receipt.gasUsed} gas\n`);
     }
@@ -2757,7 +2792,13 @@ data: ${data}
     if (typeof args === 'undefined') {
       args = [];
     }
-    let caller: Web3Provider | Signer | zk.Web3Provider | zk.Signer = provider;
+    let caller:
+      | Web3Provider
+      | Signer
+      | zk.Web3Provider
+      | zk.Signer
+      | TronWeb3Provider
+      | TronSigner = provider;
     const {ethersSigner} = await getOptionalFrom(options.from);
     if (ethersSigner) {
       caller = ethersSigner;
@@ -2818,16 +2859,16 @@ data: ${data}
   const extension: DeploymentsExtension = {
     ...partialExtension,
     fetchIfDifferent,
-    deploy,
+    deploy, // tron compatible
     diamond: {
       deploy: diamond,
     },
     catchUnknownSigner,
-    execute,
+    execute, // tron compatible
     rawTx,
-    read,
-    deterministic,
-    getSigner,
+    read, // tron compatible
+    deterministic, // won't support tron (contracts addresses are dependent on timestamps)
+    getSigner, // tron compatible
   };
 
   const utils = {
@@ -2964,7 +3005,7 @@ data: ${data}
               )) as TransactionResponse;
               txHashToWait = tx.hash;
               if (tx.hash !== txHash) {
-                console.error('non matching tx hashes after resubmitting...');
+                console.error('non mathcing tx hashes after resubmitting...');
               }
               console.log('waiting for newly broadcasted tx ...');
             } else {
@@ -3012,7 +3053,7 @@ data: ${data}
                   );
                 }
                 await onPendingTx(txReq);
-                console.error('non matching tx hashes after resubmitting...');
+                console.error('non mathcing tx hashes after resubmitting...');
               }
             }
           } else if (answer === 'increase gas') {

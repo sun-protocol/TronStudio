@@ -12,7 +12,7 @@ import {
   NetworkConfig,
 } from 'hardhat/types';
 import {createProvider} from 'hardhat/internal/core/providers/construction'; // TODO harhdat argument types not from internal
-import {LazyInitializationProviderAdapter} from "hardhat/internal/core/providers/lazy-initialization";
+import {LazyInitializationProviderAdapter} from 'hardhat/internal/core/providers/lazy-initialization';
 import {Deployment, ExtendedArtifact} from '../types';
 import {extendEnvironment, task, subtask, extendConfig} from 'hardhat/config';
 import {HARDHAT_NETWORK_NAME, HardhatPluginError} from 'hardhat/plugins';
@@ -44,6 +44,10 @@ export const TASK_DEPLOY_RUN_DEPLOY = 'deploy:runDeploy';
 export const TASK_EXPORT = 'export';
 export const TASK_ETHERSCAN_VERIFY = 'etherscan-verify';
 export const TASK_SOURCIFY = 'sourcify';
+// need to reexport all hardhat types. Sometimes intellisense will not correctly take into account the augmented interfaces set in type-extensions.ts
+// even if this plug-in is correctly imported.
+// importing the hardhat types from this package rather than hardhat is a workaround that issue.
+export * from 'hardhat/types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let nodeTaskArgs: Record<string, any> = {};
@@ -187,6 +191,7 @@ function createNetworkFromConfig(
     live: config.live,
     saveDeployments: config.saveDeployments,
     zksync: config.zksync,
+    tron: config.tron,
     tags,
     deploy: config.deploy || env.config.paths.deploy,
     companionNetworks: {},
@@ -223,6 +228,10 @@ function networkFromConfig(
 
   if (network.config.zksync !== undefined) {
     network.zksync = network.config.zksync;
+  }
+
+  if (network.config.tron !== undefined) {
+    network.tron = network.config.tron;
   }
 
   // associate tags to current network as object
@@ -381,12 +390,8 @@ function initCompanionNetworks(hre: HardhatRuntimeEnvironment) {
     }
 
     network.provider = new LazyInitializationProviderAdapter(() => {
-        return createProvider(
-          hre.config,
-          networkName,
-          hre.artifacts
-        );
-    })
+      return createProvider(hre.config, networkName, hre.artifacts);
+    });
 
     const networkDeploymentsManager = new DeploymentsManager(hre, network);
     deploymentsManager.addCompanionManager(name, networkDeploymentsManager);
@@ -758,7 +763,7 @@ task(TASK_NODE, 'Starts a JSON-RPC server on top of Hardhat EVM')
         `
 Unsupported network for JSON-RPC server. Only hardhat is currently supported.
 hardhat-deploy cannot run on the hardhat provider when defaultNetwork is not hardhat, see https://github.com/nomiclabs/hardhat/issues/1139 and https://github.com/wighawag/hardhat-deploy/issues/63
-you can specify hardhat via "--network hardhat"
+you can specifiy hardhat via "--network hardhat"
 `
       );
     }

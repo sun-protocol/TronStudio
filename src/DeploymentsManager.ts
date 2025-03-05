@@ -75,6 +75,7 @@ export class DeploymentsManager {
   public impersonateUnknownAccounts: boolean;
   public impersonatedAccounts: string[];
   public addressesToProtocol: {[address: string]: string} = {};
+  public readonly isTronNetworkWithTronSolc: boolean = false;
 
   private network: Network;
 
@@ -136,6 +137,9 @@ export class DeploymentsManager {
       runAsNode: false,
     };
     this.env = env;
+    if (network.tron && (this.env.config as any)?.tronSolc?.enable) {
+      this.isTronNetworkWithTronSolc = true;
+    }
     this.deploymentsPath = env.config.paths.deployments;
 
     // TODO
@@ -213,6 +217,8 @@ export class DeploymentsManager {
         contractName: string
       ): Promise<ExtendedArtifact> => {
         if (this.db.onlyArtifacts) {
+          // For the Tron network there is already a mechanism in this file to ensure onlyArtifacts can only point to artifacts folder ending in -tron
+          // We assume those artifacts folder ending in -tron are compatible with Tron and have been compiled with tron-solc
           const artifactFromFolder = await getExtendedArtifactFromFolders(
             contractName,
             this.db.onlyArtifacts
@@ -350,6 +356,7 @@ export class DeploymentsManager {
       },
       getNetworkName: () => this.getNetworkName(),
       getGasUsed: () => this.db.gasUsed.toNumber(),
+      isTronNetworkWithTronSolc: this.isTronNetworkWithTronSolc,
     } as PartialExtension;
 
     const print = (msg: string) => {
@@ -599,9 +606,14 @@ export class DeploymentsManager {
     return info?.deployer || '0x3fab184622dc19b6109349b94811493bf2a45362';
   }
 
-  public async getDeterministicDeploymentFactoryFunding(): Promise<BigNumber> {
+  public async getDeterministicDeploymentFactoryFunding(
+    isTron?: any
+  ): Promise<BigNumber> {
     const info = await this.getDeterminisityDeploymentInfo();
-    return BigNumber.from(info?.funding || '10000000000000000');
+    // TODO check sensible default for Tron
+    // accounting for the fact that TRX has 6 decimal places instead of 18
+    const funding_default = isTron ? '100000' : '10000000000000000';
+    return BigNumber.from(info?.funding || funding_default);
   }
 
   public async getDeterministicDeploymentFactoryDeploymentTx(): Promise<string> {
@@ -890,7 +902,6 @@ export class DeploymentsManager {
     if (deployment.factoryDeps?.length) {
       obj.factoryDeps = deployment.factoryDeps;
     }
-
     this.db.deployments[name] = obj;
     if (obj.address === undefined && obj.transactionHash !== undefined) {
       let receiptFetched;
@@ -1046,9 +1057,20 @@ export class DeploymentsManager {
     if (this.env.config.external?.contracts) {
       for (const externalContracts of this.env.config.external.contracts) {
         if (externalContracts.deploy) {
+          // make sure we're not deploying on Tron contracts that are not meant to be deployed there
+          if (
+            this.isTronNetworkWithTronSolc && // are we using tron-solc compiler and is the network a Tron network?
+            externalContracts.artifacts.some((str) => !str.endsWith('-tron')) // are some of the artifacts folder not ending in -tron?
+          ) {
+            continue;
+          }
           this.db.onlyArtifacts = externalContracts.artifacts;
           try {
-            await this.executeDeployScripts([externalContracts.deploy], tags, options.tagsRequireAll);
+            await this.executeDeployScripts(
+              [externalContracts.deploy],
+              tags,
+              options.tagsRequireAll
+            );
           } finally {
             this.db.onlyArtifacts = undefined;
           }
@@ -1068,7 +1090,7 @@ export class DeploymentsManager {
   public async executeDeployScripts(
     deployScriptsPaths: string[],
     tags: string[] = [],
-    tagsRequireAll = false,
+    tagsRequireAll = false
   ): Promise<void> {
     const wasWrittingToFiles = this.db.writeDeploymentsToFiles;
     // TODO loop over companion networks ?
@@ -1128,8 +1150,11 @@ export class DeploymentsManager {
         bag.push(scriptFilePath);
       }
       // console.log("tags found " + scriptFilePath, scriptTags);
-      if (tagsRequireAll && tags.every(tag => scriptTags.includes(tag))
-        || !tagsRequireAll && (tags.length == 0 || tags.some(tag => scriptTags.includes(tag)))) {
+      if (
+        (tagsRequireAll && tags.every((tag) => scriptTags.includes(tag))) ||
+        (!tagsRequireAll &&
+          (tags.length == 0 || tags.some((tag) => scriptTags.includes(tag))))
+      ) {
         scriptFilePaths.push(scriptFilePath);
       }
     }
@@ -1374,7 +1399,37 @@ export class DeploymentsManager {
     }
   }
 
+  /**
+   * Retrieves import paths for Tron-specific contracts.
+   *
+   * This method enforces a safety check to ensure that only contracts compiled for Tron are deployed.
+   * It requires that import paths for external folders must end with '-tron'. The method checks both
+   * the project's own import paths and any external contracts specified in the configuration.
+   *
+   * @returns {string[]} An array of import paths that conform to the Tron-specific naming convention.
+   */
+  private getTronImportPaths() {
+    const importPaths = [];
+    if (this.env.config.paths.imports.endsWith('-tron')) {
+      importPaths.push(this.env.config.paths.imports);
+    }
+    if (this.env.config.external && this.env.config.external.contracts) {
+      for (const externalContracts of this.env.config.external.contracts) {
+        for (const artifact of externalContracts.artifacts) {
+          if (artifact.endsWith('-tron')) {
+            importPaths.push(artifact);
+          }
+        }
+      }
+    }
+    return importPaths;
+  }
+
   private getImportPaths() {
+    // this check is true when the hardhat-tron-solc plugin is used and the network is Tron
+    if (this.isTronNetworkWithTronSolc) {
+      return this.getTronImportPaths();
+    }
     const importPaths = [this.env.config.paths.imports];
     if (this.env.config.external && this.env.config.external.contracts) {
       for (const externalContracts of this.env.config.external.contracts) {
