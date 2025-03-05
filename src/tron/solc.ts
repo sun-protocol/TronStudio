@@ -15,6 +15,7 @@ async function downloadFile(url: string, dest: string): Promise<void> {
       throw new Error(`network error: ${response.statusText}`);
     }
     await streamPipeline(response.body as any, createWriteStream(dest));
+    console.log(`download ${url} to ${dest} success`);
   } catch (error) {
     console.error('download failed', error);
   }
@@ -25,7 +26,7 @@ export async function loadTronSolc(solcVersion: string) {
   let compilerRemotePath = '';
   let longVersion = '';
 
-  if (solcVersion === "0.8.23") {
+  if (solcVersion == "0.8.23") {
     compilerRemotePath = 'https://github.com/tronprotocol/solidity/releases/download/tv_0.8.23/soljson.js'
     compilerPath = path.join(
       __dirname,
