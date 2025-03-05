@@ -10,11 +10,15 @@ import { Address, Deployment, DeployOptions, ExtendedArtifact } from '../types';
 import { getAddress } from '@ethersproject/address';
 import { keccak256 as solidityKeccak256 } from '@ethersproject/solidity';
 import { hexConcat } from '@ethersproject/bytes';
+import { TronContractFactory } from './tron/contract';
+import { TronSigner } from './tron/signer';
+import { CreateSmartContract } from './tron/types';
 
 export class DeploymentFactory {
   private factory: ContractFactory;
   private artifact: Artifact | ExtendedArtifact;
   private isZkSync: boolean;
+  private isTron: boolean;
   private getArtifact: (name: string) => Promise<Artifact>;
   private overrides: PayableOverrides;
   private args: any[];
@@ -23,18 +27,28 @@ export class DeploymentFactory {
     artifact: Artifact | ExtendedArtifact,
     args: any[],
     network: any,
-    ethersSigner?: Signer | zk.Signer,
+    ethersSigner?: Signer | zk.Signer | TronSigner,
     overrides: PayableOverrides = {}
   ) {
     this.overrides = overrides;
     this.getArtifact = getArtifact;
     this.isZkSync = network.zksync;
+    this.isTron = network.tron;
     this.artifact = artifact;
     if (this.isZkSync) {
       this.factory = new zk.ContractFactory(
         artifact.abi,
         artifact.bytecode,
         ethersSigner as zk.Signer
+      );
+    } else if (this.isTron) {
+      let contractName = '';
+      if ('contractName' in artifact) ({contractName} = artifact);
+      this.factory = new TronContractFactory(
+        artifact.abi,
+        artifact.bytecode,
+        ethersSigner as TronSigner,
+        contractName
       );
     } else {
       this.factory = new ContractFactory(
@@ -101,19 +115,24 @@ export class DeploymentFactory {
     return this.factory.getDeployTransaction(...this.args, overrides);
   }
 
+  // TVM formula is identical than EVM except for the prefix: keccak256( 0x41 ++ address ++ salt ++ keccak256(init_code))[12:]
+  // https://developers.tron.network/v4.4.0/docs/vm-vs-evm#tvm-is-basically-compatible-with-evm-with-some-differences-in-details
   private async calculateEvmCreate2Address(
     create2DeployerAddress: Address,
-    salt: string
+    salt: string,
+    isTron?: boolean
   ): Promise<Address> {
     const deploymentTx = await this.getDeployTransaction();
-    if (typeof deploymentTx.data !== 'string')
+    if (typeof deploymentTx.data !== 'string') {
       throw Error('unsigned tx data as bytes not supported');
+    }
+    const prefix = isTron ? '0x41' : '0xff';
     return getAddress(
       '0x' +
       solidityKeccak256(
         ['bytes'],
         [
-          `0xff${create2DeployerAddress.slice(2)}${salt.slice(
+          `${prefix}${create2DeployerAddress.slice(2)}${salt.slice(
             2
           )}${solidityKeccak256(['bytes'], [deploymentTx.data]).slice(2)}`,
         ]
@@ -146,7 +165,8 @@ export class DeploymentFactory {
       );
     return await this.calculateEvmCreate2Address(
       create2DeployerAddress,
-      create2Salt
+      create2Salt,
+      this.isTron
     );
   }
 
@@ -161,6 +181,15 @@ export class DeploymentFactory {
       const newFlattened = hexConcat(newTransaction.customData?.factoryDeps);
 
       return transaction.data !== newData || currentFlattened != newFlattened;
+    } else if (this.isTron) {
+     const tronDeployTx = newTransaction as CreateSmartContract;
+      const res = await (
+        this.factory.signer as TronSigner
+      ).getTronWebTransaction(transaction.hash);
+      const contract = res.raw_data.contract[0];
+      const deployed_bytecode = contract.parameter.value.new_contract?.bytecode;
+      const newBytecode = tronDeployTx.bytecode + tronDeployTx.rawParameter;
+      return deployed_bytecode !== newBytecode;
     } else {
       return transaction.data !== newData;
     }
