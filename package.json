@@ -84,7 +84,6 @@
   },
   "scripts": {
     "prepare": "node ./.setup.js",
-    "compile": "hardhat compile",
     "lint": "eslint \"**/*.{js,ts}\" && solhint src/**/*.sol",
     "lint:fix": "eslint --fix \"**/*.{js,ts}\" && solhint --fix src/**/*.sol",
     "format": "prettier --write \"**/*.{ts,js,sol}\"",
