@@ -43,4 +43,5 @@ export interface PartialExtension {
 
   getNetworkName(): string;
   getGasUsed(): number;
+  readonly isTronNetworkWithTronSolc: boolean;
 }
