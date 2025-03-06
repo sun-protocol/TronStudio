@@ -22,11 +22,13 @@ import {
   TASK_TEST,
   TASK_NODE_GET_PROVIDER,
   TASK_NODE_SERVER_READY,
+  TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD,
 } from 'hardhat/builtin-tasks/task-names';
 import {lazyObject} from 'hardhat/plugins';
+import {loadTronSolc} from './tron/solc';
 
 import debug from 'debug';
-const log = debug('hardhat:wighawag:hardhat-deploy');
+const log = debug('hardhat:sun-protocol:tron-studio');
 
 import {DeploymentsManager} from './DeploymentsManager';
 import chokidar from 'chokidar';
@@ -762,7 +764,6 @@ task(TASK_NODE, 'Starts a JSON-RPC server on top of Hardhat EVM')
       throw new HardhatPluginError(
         `
 Unsupported network for JSON-RPC server. Only hardhat is currently supported.
-hardhat-deploy cannot run on the hardhat provider when defaultNetwork is not hardhat, see https://github.com/nomiclabs/hardhat/issues/1139 and https://github.com/wighawag/hardhat-deploy/issues/63
 you can specifiy hardhat via "--network hardhat"
 `
       );
@@ -1094,3 +1095,20 @@ task('export-artifacts')
       fs.writeFileSync(filepath, JSON.stringify(dataToWrite, null, '  '));
     }
   });
+
+subtask(
+  TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD,
+  async (
+    args: {
+      solcVersion: string;
+    },
+    hre,
+    runSuper
+  ) => {
+    let nw = hre.hardhatArguments["network"]?hre.hardhatArguments["network"]:"localhost";
+    if (hre.config.networks[nw].tron) {
+      return await loadTronSolc(args.solcVersion);
+    }
+    return runSuper();
+  }
+);

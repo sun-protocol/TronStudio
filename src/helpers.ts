@@ -7,7 +7,7 @@ import {
 } from '@ethersproject/providers';
 import {getAddress} from '@ethersproject/address';
 import {Contract, PayableOverrides} from '@ethersproject/contracts';
-import * as zk from 'zksync-web3';
+import * as zk from 'zksync-ethers';
 import {AddressZero} from '@ethersproject/constants';
 import {BigNumber} from '@ethersproject/bignumber';
 import {Wallet} from '@ethersproject/wallet';
@@ -885,7 +885,8 @@ export function addHelpers(
 
       if (transaction) {
         const differences = await factory.compareDeploymentTransaction(
-          transaction
+          transaction,
+	  deployment
         );
         return {differences, address: deployment.address};
       } else {

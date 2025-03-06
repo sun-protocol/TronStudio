@@ -1,6 +1,6 @@
 {
   "name": "@sun-protocol/tron-studio",
-  "version": "0.0.1",
+  "version": "0.0.5",
   "description": "Hardhat Plugin For Replicable Deployments And Tests",
   "repository": "https://github.com/sun-protocol/TronStudio",
   "author": "dev",
@@ -25,6 +25,8 @@
     "dist/types*",
     "dist/extendedArtifacts/",
     "extendedArtifacts/",
+    "dist/extendedArtifactsTron/",
+    "extendedArtifactsTron/",
     "src/",
     "types.ts",
     "LICENSE",
@@ -80,13 +82,12 @@
     "match-all": "^1.2.6",
     "murmur-128": "^0.2.1",
     "qs": "^6.9.4",
-    "zksync-ethers": "^5.0.0",
+    "node-fetch": "^3.3.2",
     "tronweb": "^5.3.1",
-    "zksync-web3": "^0.14.3"
+    "zksync-ethers": "^5.0.0"
   },
   "scripts": {
     "prepare": "node ./.setup.js",
-    "compile": "hardhat compile",
     "lint": "eslint \"**/*.{js,ts}\" && solhint src/**/*.sol",
     "lint:fix": "eslint --fix \"**/*.{js,ts}\" && solhint --fix src/**/*.sol",
     "format": "prettier --write \"**/*.{ts,js,sol}\"",

@@ -1,17 +1,18 @@
 import {
+  TransactionReceipt,
   TransactionRequest,
   TransactionResponse,
 } from '@ethersproject/providers';
-import {ContractFactory, PayableOverrides, Signer} from 'ethers';
-import {Artifact} from 'hardhat/types';
-import * as zk from 'zksync-web3';
-import {Address, ExtendedArtifact} from '../types';
-import {getAddress} from '@ethersproject/address';
-import {keccak256 as solidityKeccak256} from '@ethersproject/solidity';
-import {arrayify, hexConcat} from '@ethersproject/bytes';
-import {TronContractFactory} from './tron/contract';
-import {TronSigner} from './tron/signer';
-import {CreateSmartContract} from './tron/types';
+import { ContractFactory, PayableOverrides, Signer, ethers } from 'ethers';
+import { Artifact } from 'hardhat/types';
+import * as zk from 'zksync-ethers';
+import { Address, Deployment, DeployOptions, ExtendedArtifact } from '../types';
+import { getAddress } from '@ethersproject/address';
+import { keccak256 as solidityKeccak256 } from '@ethersproject/solidity';
+import { hexConcat } from '@ethersproject/bytes';
+import { TronContractFactory } from './tron/contract';
+import { TronSigner } from './tron/signer';
+import { CreateSmartContract } from './tron/types';
 
 export class DeploymentFactory {
   private factory: ContractFactory;
@@ -65,19 +66,33 @@ export class DeploymentFactory {
     this.args = args;
   }
 
-  // TODO add ZkSyncArtifact
-  private async extractFactoryDeps(artifact: any): Promise<string[]> {
+  public async extractFactoryDeps(artifact: any): Promise<string[]> {
+    const visited = new Set<string>();
+    visited.add(`${artifact.sourceName}:${artifact.contractName}`);
+    return await this._extractFactoryDepsRecursive(artifact, visited);
+  }
+
+  private async _extractFactoryDepsRecursive(
+    artifact: any,
+    visited: Set<string>
+  ): Promise<string[]> {
     // Load all the dependency bytecodes.
     // We transform it into an array of bytecodes.
     const factoryDeps: string[] = [];
     for (const dependencyHash in artifact.factoryDeps) {
+      if (!dependencyHash) continue;
       const dependencyContract = artifact.factoryDeps[dependencyHash];
-      const dependencyBytecodeString = (
-        await this.getArtifact(dependencyContract)
-      ).bytecode;
-      factoryDeps.push(dependencyBytecodeString);
+      if (!visited.has(dependencyContract)) {
+        const dependencyArtifact = await this.getArtifact(dependencyContract);
+        factoryDeps.push(dependencyArtifact.bytecode);
+        visited.add(dependencyContract);
+        const transitiveDeps = await this._extractFactoryDepsRecursive(
+          dependencyArtifact,
+          visited
+        );
+        factoryDeps.push(...transitiveDeps);
+      }
     }
-
     return factoryDeps;
   }
 
@@ -114,14 +129,14 @@ export class DeploymentFactory {
     const prefix = isTron ? '0x41' : '0xff';
     return getAddress(
       '0x' +
-        solidityKeccak256(
-          ['bytes'],
-          [
-            `${prefix}${create2DeployerAddress.slice(2)}${salt.slice(
-              2
-            )}${solidityKeccak256(['bytes'], [deploymentTx.data]).slice(2)}`,
-          ]
-        ).slice(-40)
+      solidityKeccak256(
+        ['bytes'],
+        [
+          `${prefix}${create2DeployerAddress.slice(2)}${salt.slice(
+            2
+          )}${solidityKeccak256(['bytes'], [deploymentTx.data]).slice(2)}`,
+        ]
+      ).slice(-40)
     );
   }
 
@@ -156,25 +171,18 @@ export class DeploymentFactory {
   }
 
   public async compareDeploymentTransaction(
-    transaction: TransactionResponse
+    transaction: TransactionResponse,
+    deployment: Deployment
   ): Promise<boolean> {
     const newTransaction = await this.getDeployTransaction();
     const newData = newTransaction.data?.toString();
     if (this.isZkSync) {
-      const EIP712_TX_TYPE = 0x71;
-      const bytes = arrayify(transaction.data);
-      // zk.utils.parseTransaction cannot parse tx others than eip712
-      if (bytes[0] != EIP712_TX_TYPE) {
-        return transaction.data !== newData;
-      }
-      const deserialize = zk.utils.parseTransaction(transaction.data) as any;
-      const desFlattened = hexConcat(deserialize.customData.factoryDeps);
-      const factoryDeps = await this.extractFactoryDeps(this.artifact);
-      const newFlattened = hexConcat(factoryDeps);
+      const currentFlattened = hexConcat(deployment.factoryDeps || []);
+      const newFlattened = hexConcat(newTransaction.customData?.factoryDeps);
 
-      return deserialize.data !== newData || desFlattened != newFlattened;
+      return transaction.data !== newData || currentFlattened != newFlattened;
     } else if (this.isTron) {
-      const tronDeployTx = newTransaction as CreateSmartContract;
+     const tronDeployTx = newTransaction as CreateSmartContract;
       const res = await (
         this.factory.signer as TronSigner
       ).getTronWebTransaction(transaction.hash);
@@ -185,5 +193,25 @@ export class DeploymentFactory {
     } else {
       return transaction.data !== newData;
     }
+  }
+
+  getDeployedAddress(
+    receipt: TransactionReceipt,
+    options: DeployOptions,
+    create2Address: string | undefined
+  ): string {
+    if (options.deterministicDeployment && create2Address) {
+      return create2Address;
+    }
+
+    if (this.isZkSync) {
+      const deployedAddresses = zk.utils
+        .getDeployedContracts(receipt)
+        .map((info) => info.deployedAddress);
+
+      return deployedAddresses[deployedAddresses.length - 1];
+    }
+
+    return receipt.contractAddress;
   }
 }
