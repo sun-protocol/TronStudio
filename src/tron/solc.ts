@@ -1,7 +1,7 @@
-const path = require("path");
-import { access, constants, promises as fsPromises  } from 'fs';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import * as path from 'path';
+import { constants, promises as fsPromises  } from 'fs';
 import fetch from 'node-fetch';
-import { writeFile } from 'fs/promises';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream';
 import { promisify } from 'util';
@@ -221,7 +221,7 @@ export async function loadTronSolc(solcVersion: string) {
     throw new Error(`unkown solcVersion = ${solcVersion}`);
   }
 
-  let needDownload = !await checkFileExists(compilerPath);
+  const needDownload = !await checkFileExists(compilerPath);
   if (needDownload) {
     await downloadFile(compilerRemotePath, compilerPath);    
   }

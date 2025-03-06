@@ -1105,7 +1105,7 @@ subtask(
     hre,
     runSuper
   ) => {
-    let nw = hre.hardhatArguments["network"]?hre.hardhatArguments["network"]:"localhost";
+    const nw = hre.hardhatArguments["network"]?hre.hardhatArguments["network"]:"localhost";
     if (hre.config.networks[nw].tron && (hre.config as any)?.tronSolc?.enable) {
       // are we using tron-solc compiler and is the network a Tron network
       return await loadTronSolc(args.solcVersion);
