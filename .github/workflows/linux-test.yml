@@ -11,7 +11,7 @@ jobs:
     name: Build and Test ubuntu
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v4
       - name: build 
         run: |
             pnpm install
