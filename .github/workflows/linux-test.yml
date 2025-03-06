@@ -1,0 +1,21 @@
+name: ubuntu test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build and Test ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: build 
+        run: |
+            pnpm install
+            pnpm run build
+      - name: test
+        run: |
+            pnpm run test
