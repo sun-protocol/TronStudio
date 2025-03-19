@@ -17,7 +17,7 @@ import path from 'path';
 import {BigNumber} from '@ethersproject/bignumber';
 
 import debug from 'debug';
-const log = debug('hardhat:wighawag:hardhat-deploy');
+const log = debug('hardhat:sun-protocol:tron-studio');
 
 import {
   addDeployments,
@@ -796,7 +796,7 @@ export class DeploymentsManager {
         `deployment name must not be a path or Fully Qualified Name - for such purposes consider using the "contract" field of deployment options`
       );
     }
-    
+
     const chainId = await this.getChainId();
 
     const toSave =
