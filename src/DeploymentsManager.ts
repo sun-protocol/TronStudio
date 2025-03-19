@@ -844,6 +844,9 @@ export class DeploymentsManager {
         deployment.address = tronweb.address.fromHex(deployment.address);
         if(actualReceipt){
           actualReceipt.from = tronweb.address.fromHex(actualReceipt.from);
+          if(actualReceipt.contractAddress) {
+            actualReceipt.contractAddress = tronweb.address.fromHex(actualReceipt.contractAddress);
+          }
         }
       }
     // from : https://stackoverflow.com/a/14810722/1663971
