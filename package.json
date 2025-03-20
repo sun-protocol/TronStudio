@@ -1,7 +1,7 @@
 {
   "name": "@sun-protocol/tron-studio",
-  "version": "0.0.5",
-  "description": "Hardhat Plugin For Replicable Deployments And Tests",
+  "version": "0.0.6",
+  "description": "Environment configuration and partial optimization",
   "repository": "https://github.com/sun-protocol/TronStudio",
   "author": "dev",
   "license": "MIT",
