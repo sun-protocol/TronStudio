@@ -17,7 +17,7 @@ import path from 'path';
 import {BigNumber} from '@ethersproject/bignumber';
 
 import debug from 'debug';
-const log = debug('hardhat:wighawag:hardhat-deploy');
+const log = debug('hardhat:sun-protocol:tron-studio');
 
 import {
   addDeployments,
@@ -35,6 +35,7 @@ import {TransactionResponse} from '@ethersproject/providers';
 import {Artifact, HardhatRuntimeEnvironment, Network} from 'hardhat/types';
 import {store} from './globalStore';
 import {bnReplacer} from './internal/utils';
+import TronWeb from 'tronweb';
 
 export class DeploymentsManager {
   public deploymentsExtension: DeploymentsExtension;
@@ -834,7 +835,20 @@ export class DeploymentsManager {
           byzantium: receipt.byzantium,
         }
       : undefined;
-
+    if (this.isTronNetworkWithTronSolc) {
+        const tronweb = new TronWeb(
+          this.env.config.networks.localhost.url,
+          this.env.config.networks.localhost.url,
+          false,
+          false);
+        deployment.address = tronweb.address.fromHex(deployment.address);
+        if(actualReceipt){
+          actualReceipt.from = tronweb.address.fromHex(actualReceipt.from);
+          if(actualReceipt.contractAddress) {
+            actualReceipt.contractAddress = tronweb.address.fromHex(actualReceipt.contractAddress);
+          }
+        }
+      }
     // from : https://stackoverflow.com/a/14810722/1663971
     function objectMap(object: any, mapFn: (obj: any) => any) {
       return Object.keys(object).reduce(function (result: any, key) {

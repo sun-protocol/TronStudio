@@ -1,0 +1,22 @@
+name: ubuntu test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build and Test ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: build 
+        run: |
+            pnpm install
+            pnpm run build
