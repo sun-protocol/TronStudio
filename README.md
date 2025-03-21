@@ -14,6 +14,6 @@ Build
 ```
 npm run build
 ```
-# Useage
+# Usage
 
 see https://github.com/sun-protocol/tron-studio-demo
