@@ -1,7 +1,7 @@
 {
   "name": "@sun-protocol/tron-studio",
-  "version": "0.0.6",
-  "description": "Environment configuration and partial optimization",
+  "version": "0.1.0",
+  "description": "Release 0.1.0 version",
   "repository": "https://github.com/sun-protocol/TronStudio",
   "author": "dev",
   "license": "MIT",
@@ -81,8 +81,9 @@
     "fs-extra": "^10.0.0",
     "match-all": "^1.2.6",
     "murmur-128": "^0.2.1",
-    "qs": "^6.9.4",
     "node-fetch": "^3.3.2",
+    "pnpm": "^10.6.5",
+    "qs": "^6.9.4",
     "tronweb": "^5.3.1",
     "zksync-ethers": "^5.0.0"
   },
