@@ -16,7 +16,11 @@ export function useEnvironment(
     process.chdir(path.join(__dirname, 'fixture-projects', fixtureProjectName));
     process.env.HARDHAT_NETWORK = networkName;
 
-    this.env = require('hardhat');
+    try {
+      this.env = require('hardhat');
+    } catch (error) {
+      console.error('Failed to load Hardhat environment:', error);
+    }
   });
 
   afterEach('Resetting hardhat', function () {
