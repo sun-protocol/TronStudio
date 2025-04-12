@@ -11,9 +11,7 @@
     "rootDirs": ["./src", "./test"],
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "allowSyntheticDefaultImports": true,
-    "typeRoots": ["./types", "./node_modules/@types"],
+    "skipLibCheck": true
   },
   "exclude": ["dist", "node_modules"],
   "include": ["./test", "./src", "types.ts"]
