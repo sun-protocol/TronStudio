@@ -18,6 +18,7 @@ export function useEnvironment(
 
     try {
       this.env = require('hardhat');
+      // console.log(this.env);
     } catch (error) {
       console.error('Failed to load Hardhat environment:', error);
     }
