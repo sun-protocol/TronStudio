@@ -36,7 +36,7 @@ import {
 } from '../types';
 import {PartialExtension} from './internal/types';
 import {UnknownSignerError} from './errors';
-import {filterABI, mergeABIs, recode} from './utils';
+import {filterABI, mergeABIs, recode, countElements} from './utils';
 import fs from 'fs-extra';
 
 import oldDiamonBase from './old_diamondbase.json';
@@ -640,12 +640,14 @@ export function addHelpers(
       options.deterministicDeployment && create2Address
         ? create2Address
         : receipt.contractAddress;
+    const argNumbers = countElements(preDeployment.args);
     const deployment = {
       ...preDeployment,
       address,
       receipt,
       transactionHash: receipt.transactionHash,
       libraries: options.libraries,
+      bandwith:preDeployment.deployedBytecode.length + 64 * argNumbers + 8,
     };
     await saveDeployment(name, deployment);
     if (options.log || hardwareWallet) {

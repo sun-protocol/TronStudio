@@ -655,3 +655,16 @@ export function recode(decoded: any): Transaction {
     chainId: decoded.chainId,
   };
 }
+
+export function countElements(arr: any) {
+  let count = 0;
+
+  for (const item of arr) {
+    if (Array.isArray(item)) {
+      count += countElements(item); 
+    } else {
+      count += 1;
+    }
+  }
+  return count;
+}

@@ -35,7 +35,7 @@ import {TransactionResponse} from '@ethersproject/providers';
 import {Artifact, HardhatRuntimeEnvironment, Network} from 'hardhat/types';
 import {store} from './globalStore';
 import {bnReplacer} from './internal/utils';
-import {TronWeb} from 'tronweb';
+import TronWeb from 'tronweb';
 
 export class DeploymentsManager {
   public deploymentsExtension: DeploymentsExtension;
@@ -916,6 +916,7 @@ export class DeploymentsManager {
           storageLayout: deployment.storageLayout,
           methodIdentifiers: deployment.methodIdentifiers,
           gasEstimates: deployment.gasEstimates, // TODO double check : use evm field ?
+          bandwith: deployment.bandwith,
         },
         bnReplacer
       )
