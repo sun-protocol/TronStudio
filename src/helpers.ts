@@ -625,6 +625,7 @@ export function addHelpers(
       transactionHash: tx.hash,
       args,
       linkedData: options.linkedData,
+      bandwith: tx.raw? tx.raw.length:0, 
     };
     if (artifactName && willSaveToDisk()) {
       const extendedArtifact = await partialExtension.getExtendedArtifact(
@@ -645,10 +646,10 @@ export function addHelpers(
     var address;
     if (network.tron){
       const tronweb = new TronWeb(
-        network.tron.url,
-        network.tron.url,
+        `http://127.0.0.1:9090/jsonrpc`,
+        `http://127.0.0.1:9090/jsonrpc`,
         false,
-        false,
+        false
       );
       receipt = receiptPre;
       receipt.from = tronweb.address.fromHex(receiptPre.from);
@@ -666,7 +667,6 @@ export function addHelpers(
       receipt,
       transactionHash: receipt.transactionHash,
       libraries: options.libraries,
-      bandwith:preDeployment.deployedBytecode.length + 64 * argNumbers + 8,
     };
     await saveDeployment(name, deployment);
     if (options.log || hardwareWallet) {
