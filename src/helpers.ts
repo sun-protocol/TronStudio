@@ -54,6 +54,7 @@ import {TronWeb3Provider} from './tron/provider';
 import {TronSigner} from './tron/signer';
 import {CreateSmartContract} from './tron/types';
 import {getDefaultArtifact} from './defaultArtifacts';
+import TronWeb from 'tronweb';
 
 let LedgerSigner: any; // TODO type
 let ethersprojectHardwareWalletsModule: any | undefined;
@@ -635,11 +636,29 @@ export function addHelpers(
       };
     }
     tx = await onPendingTx(tx, name, preDeployment);
-    const receipt = await tx.wait(options.waitConfirmations);
-    const address =
+    const receiptPre = await tx.wait(options.waitConfirmations);
+    const addressPre =
       options.deterministicDeployment && create2Address
         ? create2Address
-        : receipt.contractAddress;
+        : receiptPre.contractAddress;
+    var receipt;
+    var address;
+    if (network.tron){
+      const tronweb = new TronWeb(
+        network.tron.url,
+        network.tron.url,
+        false,
+        false,
+      );
+      receipt = receiptPre;
+      receipt.from = tronweb.address.fromHex(receiptPre.from);
+      receipt.to = tronweb.address.fromHex(receiptPre.to);
+      address = tronweb.address.fromHex(addressPre);
+    }else{
+      receipt = receiptPre;
+      address = addressPre;
+    }
+   
     const argNumbers = countElements(preDeployment.args);
     const deployment = {
       ...preDeployment,
