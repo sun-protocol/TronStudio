@@ -624,8 +624,7 @@ export function addHelpers(
       ...linkedArtifact,
       transactionHash: tx.hash,
       args,
-      linkedData: options.linkedData,
-      bandwith: tx.raw? tx.raw.length:0, 
+      linkedData: options.linkedData
     };
     if (artifactName && willSaveToDisk()) {
       const extendedArtifact = await partialExtension.getExtendedArtifact(
@@ -667,6 +666,7 @@ export function addHelpers(
       receipt,
       transactionHash: receipt.transactionHash,
       libraries: options.libraries,
+      bandwith: tx.raw? tx.raw.length : 0,
     };
     await saveDeployment(name, deployment);
     if (options.log || hardwareWallet) {
