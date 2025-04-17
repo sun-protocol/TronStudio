@@ -42,6 +42,7 @@ export class DeploymentsManager {
 
   private db: {
     gasUsed: BigNumber;
+    bandwith: BigNumber;
     accountsLoaded: boolean;
     namedAccounts: {[name: string]: string};
     unnamedAccounts: string[];
@@ -121,6 +122,7 @@ export class DeploymentsManager {
     this.impersonatedAccounts = [];
     this.db = {
       gasUsed: BigNumber.from(0),
+      bandwith: BigNumber.from(0),
       accountsLoaded: false,
       namedAccounts: {},
       unnamedAccounts: [],
@@ -357,6 +359,7 @@ export class DeploymentsManager {
       },
       getNetworkName: () => this.getNetworkName(),
       getGasUsed: () => this.db.gasUsed.toNumber(),
+      getBandwith: () => this.db.bandwith.toNumber(),
       isTronNetworkWithTronSolc: this.isTronNetworkWithTronSolc,
     } as PartialExtension;
 
@@ -566,6 +569,9 @@ export class DeploymentsManager {
           );
         }
         this.db.gasUsed = this.db.gasUsed.add(receipt.gasUsed);
+        if(rawTx){
+          this.db.bandwith = this.db.bandwith.add(rawTx?.length);
+        }
         return receipt;
       };
     } else {
@@ -1032,6 +1038,7 @@ export class DeploymentsManager {
 
     await this.loadDeployments();
     this.db.gasUsed = BigNumber.from(0);
+    this.db.bandwith = BigNumber.from(0);
     this.db.writeDeploymentsToFiles = options.writeDeploymentsToFiles;
     this.db.savePendingTx = options.savePendingTx;
     this.db.logEnabled = options.log;
