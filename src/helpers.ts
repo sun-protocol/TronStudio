@@ -36,7 +36,7 @@ import {
 } from '../types';
 import {PartialExtension} from './internal/types';
 import {UnknownSignerError} from './errors';
-import {filterABI, mergeABIs, recode} from './utils';
+import {filterABI, mergeABIs, recode, countElements} from './utils';
 import fs from 'fs-extra';
 
 import oldDiamonBase from './old_diamondbase.json';
@@ -54,6 +54,7 @@ import {TronWeb3Provider} from './tron/provider';
 import {TronSigner} from './tron/signer';
 import {CreateSmartContract} from './tron/types';
 import {getDefaultArtifact} from './defaultArtifacts';
+import TronWeb from 'tronweb';
 
 let LedgerSigner: any; // TODO type
 let ethersprojectHardwareWalletsModule: any | undefined;
@@ -623,7 +624,7 @@ export function addHelpers(
       ...linkedArtifact,
       transactionHash: tx.hash,
       args,
-      linkedData: options.linkedData,
+      linkedData: options.linkedData
     };
     if (artifactName && willSaveToDisk()) {
       const extendedArtifact = await partialExtension.getExtendedArtifact(
@@ -635,17 +636,37 @@ export function addHelpers(
       };
     }
     tx = await onPendingTx(tx, name, preDeployment);
-    const receipt = await tx.wait(options.waitConfirmations);
-    const address =
+    const receiptPre = await tx.wait(options.waitConfirmations);
+    const addressPre =
       options.deterministicDeployment && create2Address
         ? create2Address
-        : receipt.contractAddress;
+        : receiptPre.contractAddress;
+    var receipt;
+    var address;
+    if (network.tron){
+      const tronweb = new TronWeb(
+        `http://127.0.0.1:9090/jsonrpc`,
+        `http://127.0.0.1:9090/jsonrpc`,
+        false,
+        false
+      );
+      receipt = receiptPre;
+      receipt.from = tronweb.address.fromHex(receiptPre.from);
+      receipt.to = tronweb.address.fromHex(receiptPre.to);
+      address = tronweb.address.fromHex(addressPre);
+    }else{
+      receipt = receiptPre;
+      address = addressPre;
+    }
+   
+    const argNumbers = countElements(preDeployment.args);
     const deployment = {
       ...preDeployment,
       address,
       receipt,
       transactionHash: receipt.transactionHash,
       libraries: options.libraries,
+      bandwith: preDeployment.deployedBytecode.length + 32 * argNumbers + preDeployment.contractName.length,
     };
     await saveDeployment(name, deployment);
     if (options.log || hardwareWallet) {

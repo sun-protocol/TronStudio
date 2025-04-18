@@ -16,7 +16,34 @@ export function useEnvironment(
     process.chdir(path.join(__dirname, 'fixture-projects', fixtureProjectName));
     process.env.HARDHAT_NETWORK = networkName;
 
-    this.env = require('hardhat');
+    try {
+      this.env = require('hardhat');
+      // console.log(this.env);
+    } catch (error) {
+      console.error('Failed to load Hardhat environment:', error);
+    }
+  });
+
+  afterEach('Resetting hardhat', function () {
+    resetHardhatContext();
+  });
+}
+
+export function useTronEnvironment(
+  fixtureProjectName: string,
+  networkName = 'tron'
+): void {
+  beforeEach('Loading hardhat environment', function () {
+    process.chdir(path.join(__dirname, 'fixture-projects', fixtureProjectName));
+    process.env.HARDHAT_NETWORK = networkName;
+
+    try {
+      this.env = require('hardhat');
+      // console.log(this.env);
+      
+    } catch (error) {
+      console.error('Failed to load Hardhat environment:', error);
+    }
   });
 
   afterEach('Resetting hardhat', function () {

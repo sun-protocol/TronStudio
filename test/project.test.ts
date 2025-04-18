@@ -1,14 +1,26 @@
 import {assert} from 'chai';
 
-import {useEnvironment} from './helpers';
+import {useEnvironment,useTronEnvironment} from './helpers';
 
 describe('hardhat-deploy hre extension', function () {
   useEnvironment('hardhat-project', 'hardhat');
   it('It should add the deployments field', function () {
-    assert.isNotNull(this.env.deployments);
+    assert.isNotNull(this.env.deployments);    
   });
 
   it('The getChainId should give the correct chainId', async function () {
-    assert.equal(await this.env.getChainId(), '31337');
+    assert.equal(await this.env.network.config.chainId, 31337);
+  });
+});
+
+
+describe('hardhat-deploy hre-tron extension', function () {
+  useTronEnvironment('hardhat-project', 'tron');
+  it('It should add the deployments field', function () {
+    assert.isNotNull(this.env.deployments);    
+  });
+
+  it('The Tron network flag should give the correct vaule', async function () {
+    assert.equal(await this.env.network.config.tron, true);
   });
 });

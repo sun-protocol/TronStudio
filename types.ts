@@ -361,6 +361,7 @@ export interface DeploymentSubmission {
   libraries?: Libraries;
   gasEstimates?: any;
   factoryDeps?: string[];
+  bandwith?: number;
 }
 
 // export type LibraryReferences = {
@@ -389,6 +390,7 @@ export interface Deployment {
   storageLayout?: any;
   gasEstimates?: any;
   factoryDeps?: string[];
+  bandwith?: number;
 }
 
 export interface DeterministicDeploymentInfo {

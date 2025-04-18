@@ -35,13 +35,13 @@ import {TransactionResponse} from '@ethersproject/providers';
 import {Artifact, HardhatRuntimeEnvironment, Network} from 'hardhat/types';
 import {store} from './globalStore';
 import {bnReplacer} from './internal/utils';
-import TronWeb from 'tronweb';
 
 export class DeploymentsManager {
   public deploymentsExtension: DeploymentsExtension;
 
   private db: {
     gasUsed: BigNumber;
+    bandwith: BigNumber;
     accountsLoaded: boolean;
     namedAccounts: {[name: string]: string};
     unnamedAccounts: string[];
@@ -121,6 +121,7 @@ export class DeploymentsManager {
     this.impersonatedAccounts = [];
     this.db = {
       gasUsed: BigNumber.from(0),
+      bandwith: BigNumber.from(0),
       accountsLoaded: false,
       namedAccounts: {},
       unnamedAccounts: [],
@@ -357,6 +358,7 @@ export class DeploymentsManager {
       },
       getNetworkName: () => this.getNetworkName(),
       getGasUsed: () => this.db.gasUsed.toNumber(),
+      getBandwith: () => this.db.bandwith.toNumber(),
       isTronNetworkWithTronSolc: this.isTronNetworkWithTronSolc,
     } as PartialExtension;
 
@@ -566,6 +568,9 @@ export class DeploymentsManager {
           );
         }
         this.db.gasUsed = this.db.gasUsed.add(receipt.gasUsed);
+        if(rawTx){
+          this.db.bandwith = this.db.bandwith.add(rawTx?.length);
+        }
         return receipt;
       };
     } else {
@@ -835,20 +840,7 @@ export class DeploymentsManager {
           byzantium: receipt.byzantium,
         }
       : undefined;
-    if (this.isTronNetworkWithTronSolc) {
-        const tronweb = new TronWeb(
-          this.env.config.networks.localhost.url,
-          this.env.config.networks.localhost.url,
-          false,
-          false);
-        deployment.address = tronweb.address.fromHex(deployment.address);
-        if(actualReceipt){
-          actualReceipt.from = tronweb.address.fromHex(actualReceipt.from);
-          if(actualReceipt.contractAddress) {
-            actualReceipt.contractAddress = tronweb.address.fromHex(actualReceipt.contractAddress);
-          }
-        }
-      }
+
     // from : https://stackoverflow.com/a/14810722/1663971
     function objectMap(object: any, mapFn: (obj: any) => any) {
       return Object.keys(object).reduce(function (result: any, key) {
@@ -909,6 +901,7 @@ export class DeploymentsManager {
           storageLayout: deployment.storageLayout,
           methodIdentifiers: deployment.methodIdentifiers,
           gasEstimates: deployment.gasEstimates, // TODO double check : use evm field ?
+          bandwith: deployment.bandwith,
         },
         bnReplacer
       )
@@ -1031,6 +1024,7 @@ export class DeploymentsManager {
 
     await this.loadDeployments();
     this.db.gasUsed = BigNumber.from(0);
+    this.db.bandwith = BigNumber.from(0);
     this.db.writeDeploymentsToFiles = options.writeDeploymentsToFiles;
     this.db.savePendingTx = options.savePendingTx;
     this.db.logEnabled = options.log;
