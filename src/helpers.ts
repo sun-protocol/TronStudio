@@ -666,7 +666,7 @@ export function addHelpers(
       receipt,
       transactionHash: receipt.transactionHash,
       libraries: options.libraries,
-      bandwith: tx.raw? tx.raw.length : 0,
+      bandwith: preDeployment.deployedBytecode.length + 32 * argNumbers + preDeployment.contractName.length,
     };
     await saveDeployment(name, deployment);
     if (options.log || hardwareWallet) {
