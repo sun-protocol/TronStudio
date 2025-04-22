@@ -281,4 +281,8 @@ export class TronSigner extends Wallet {
     if ('Error' in res) throw new TronWebGetTransactionError(res);
     return res;
   }
+  
+  getTronWeb() {
+    return this.tronweb;
+  }
 }

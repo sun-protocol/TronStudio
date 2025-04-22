@@ -635,18 +635,30 @@ export function addHelpers(
         ...preDeployment,
       };
     }
+    type TronTxInfo = {
+      receipt?: {
+        net_usage?: number;
+        energy_usage_total?: number;
+      };
+      fee?: number;
+    };
+
     tx = await onPendingTx(tx, name, preDeployment);
     const receiptPre = await tx.wait(options.waitConfirmations);
     const addressPre =
       options.deterministicDeployment && create2Address
         ? create2Address
         : receiptPre.contractAddress;
-    var receipt;
-    var address;
-    if (network.tron){
+    let receipt;
+    let address;
+    let bandwith;
+    if (network.tron && ethersSigner instanceof TronSigner){
+
+      const tronwebCurr = ethersSigner.getTronWeb();
+      const url = tronwebCurr.fullNode.host.replace(/\/jsonrpc$/, "");
       const tronweb = new TronWeb(
-        `http://127.0.0.1:9090/jsonrpc`,
-        `http://127.0.0.1:9090/jsonrpc`,
+        url,
+        url,
         false,
         false
       );
@@ -654,6 +666,13 @@ export function addHelpers(
       receipt.from = tronweb.address.fromHex(receiptPre.from);
       receipt.to = tronweb.address.fromHex(receiptPre.to);
       address = tronweb.address.fromHex(addressPre);
+      const resp = await tronweb.trx.getUnconfirmedTransactionInfo(tx.hash) as TronTxInfo;
+      if (resp?.receipt?.net_usage != null) {
+        bandwith = resp?.receipt?.net_usage;
+      } else if (resp?.fee != null) {
+        bandwith = resp.fee;
+      }
+      
     }else{
       receipt = receiptPre;
       address = addressPre;
@@ -666,7 +685,7 @@ export function addHelpers(
       receipt,
       transactionHash: receipt.transactionHash,
       libraries: options.libraries,
-      bandwith: preDeployment.deployedBytecode.length + 32 * argNumbers + preDeployment.contractName.length,
+      bandwith: bandwith,
     };
     await saveDeployment(name, deployment);
     if (options.log || hardwareWallet) {
