@@ -672,7 +672,6 @@ export function addHelpers(
       } else if (resp?.fee != null) {
         bandwith = resp.fee;
       }
-      
     }else{
       receipt = receiptPre;
       address = addressPre;

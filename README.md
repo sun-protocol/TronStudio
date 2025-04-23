@@ -1,7 +1,7 @@
 <h1>TronStudio</h1>
 
 _A [Hardhat](https://hardhat.org) Plugin For Replicable Deployments And Easy Testing on Tron_
->TronStudio is a fork of [hardhat-deploy](https://github.com/wighawag/TronStudio/tree/main)
+>TronStudio is a fork of [hardhat-deploy](https://github.com/wighawag/hardhat-deploy/tree/main)
 
 - [What is it for?](#what-is-it-for)
 - [TronStudio in a nutshell](#TronStudio-in-a-nutshell)
