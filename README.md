@@ -99,7 +99,7 @@ There is a demo covering the basics here: https://github.com/sun-protocol/tron-s
 ### npm install TronStudio
 
 ```bash
-npm install -D TronStudio
+npm i @sun-protocol/tron-studio
 ```
 
 
