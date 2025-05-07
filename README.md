@@ -64,21 +64,22 @@ It also adds a mechanism to associate names to addresses, so test and deployment
 
 Before going into the details, here is a very simple summary of the basic feature of **TronStudio**.
 
-**TronStudio** allows you to write [`deploy scripts`](#deploy-scripts) in the `deploy` folder. Each of these files that look as follows will be executed in turn when you execute the following task: `hardhat --network <networkName> --tags alice deploy`
+**TronStudio** allows you to write [`deploy scripts`](#deploy-scripts) in the `deployTron` folder. If you want to use evm chains, this scripts will be in `deploy` folder. Each of these files that look as follows will be executed in turn when you execute the following task: `hardhat --network <networkName> --tags alice deploy`
 
 ```js
-// deploy/00_deploy_my_contract.js
+// deployTron/1.ts
 module.exports = async ({getNamedAccounts, deployments}) => {
   const {deploy} = deployments;
   const {deployer} = await getNamedAccounts();
-  await deploy('MyContract', {
+  const res = await deploy('Lock', {
     from: deployer,
-    args: ['Hello'],
-    tags: 'alice',
-    log: true,
+    gasLimit: 4000000,
+    args: [1893456000],
+    tags: 'lumi',
   });
+  console.log(res)
 };
-module.exports.tags = ['MyContract'];
+module.exports.tags = ['lumi'];
 ```
 
 Furthermore you can also ensure these scripts are executed in test too by calling `await deployments.fixture(['MyContract'])` in your test.
@@ -207,15 +208,13 @@ You would get the following folder structure:
 deployments/
   mainnet/
     .chainId
-    Greeter.json
+    Lock.json
   rinkeby/
     .chainId
-    Greeter.json
-    Registry.json
+    Lock.json
   nile/
     .chainId
-    Greeter.json
-    Registry.json
+    Lock.json
 ```
 
 The reason why **TronStudio** save chainId in the `.chainId` file is both for
