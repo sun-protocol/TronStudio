@@ -1,8 +1,8 @@
 {
-  "name": "@sun-protocol/tron-studio",
-  "version": "0.2.1",
-  "description": "Release 0.2.1 version",
-  "repository": "https://github.com/sun-protocol/TronStudio",
+  "name": "@sun-protocol/sun-studio",
+  "version": "0.2.2",
+  "description": "Release 0.2.2 version",
+  "repository": "https://github.com/sun-protocol/sun-studio.git",
   "author": "dev",
   "license": "MIT",
   "publishConfig": {

@@ -5,4 +5,4 @@ artifacts
 cache
 extendedArtifacts/
 package-lock.json
-
+.vscode/
